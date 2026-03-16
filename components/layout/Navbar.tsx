@@ -54,15 +54,8 @@ export default function Navbar({
         <div className="max-w-5xl mx-auto px-5 h-[56px] flex items-center justify-between">
 
           {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-2.5 group flex-shrink-0">
-            <div className="w-8 h-8 rounded-[10px] bg-ap-blue flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="3" fill="white" />
-                <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"
-                  stroke="white" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-            </div>
-            <span className="text-[16px] font-bold text-ap-primary tracking-tight">Lotto</span>
+          <Link href="/dashboard" className="flex items-center group flex-shrink-0">
+            <img src="/logo.png" alt="1168Lot" className="h-20 w-auto object-contain group-hover:opacity-90 transition-opacity" />
           </Link>
 
           {/* Desktop nav links */}
