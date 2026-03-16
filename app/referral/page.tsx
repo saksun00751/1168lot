@@ -35,7 +35,7 @@ export default async function ReferralRoute() {
   // Serialize Prisma Decimal → number, Date → ISO string
   // (Next.js cannot pass non-plain objects from Server → Client components)
   const referrals = rawReferrals.map((r) => ({
-    id:          r.id,
+    id:          String(r.id),
     totalEarned: parseFloat(String(r.totalEarned)),
     createdAt:   r.createdAt.toISOString(),
     referee: {

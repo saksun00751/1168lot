@@ -31,10 +31,11 @@ export default function Navbar({
   }, [profileOpen]);
 
   const navLinks = [
-    { href: "/dashboard", label: "หน้าหลัก",    icon: "⊞" },
-    { href: "/bet",       label: "แทงหวย",       icon: "🎯" },
-    { href: "/referral",  label: "แนะนำเพื่อน", icon: "🎁" },
-    { href: "/profile",   label: "สมาชิก",       icon: "👤" },
+    { href: "/dashboard", label: "หน้าแรก",  icon: "🏠" },
+    { href: "/deposit",   label: "เติมเงิน",  icon: "💰" },
+    { href: "/bet",       label: "แทงหวย",   icon: "🎯" },
+    { href: "/withdraw",  label: "ถอนเงิน",  icon: "💸" },
+    { href: "/profile",   label: "สมาชิก",   icon: "👤" },
   ];
 
   const profileMenuItems = [
