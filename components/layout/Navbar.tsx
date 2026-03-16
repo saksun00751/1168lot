@@ -55,7 +55,7 @@ export default function Navbar({
 
           {/* Logo */}
           <Link href="/dashboard" className="flex items-center group flex-shrink-0">
-            <img src="/logo.png" alt="1168Lot" className="h-20 w-auto object-contain group-hover:opacity-90 transition-opacity" />
+            <img src="/logo.png" alt="1168Lot" className="h-28 w-auto object-contain group-hover:opacity-90 transition-opacity" />
           </Link>
 
           {/* Desktop nav links */}
