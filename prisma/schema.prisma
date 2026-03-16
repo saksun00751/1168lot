@@ -1,0 +1,416 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model User {
+  id           String    @id @default(cuid())
+  phone        String    @unique
+  passwordHash String?
+  displayName  String?
+  bankName     String?
+  bankAccount  String?
+  balance      Decimal   @default(0.00) @db.Decimal(15, 2)
+  level        Int       @default(1)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  sessions     Session[]
+  isActive     Boolean   @default(true)
+
+  // Referral
+  referralCode   String?    @unique @db.VarChar(20)
+  referredByCode String?    @db.VarChar(20)
+  referrals      Referral[] @relation("referrer")
+  referredBy     Referral?  @relation("referee")
+
+  @@index([referralCode])
+  @@map("users")
+}
+
+model Referral {
+  id          Int      @id @default(autoincrement())
+  referrerId  String
+  refereeId   String   @unique
+  referrer    User     @relation("referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referee     User     @relation("referee", fields: [refereeId], references: [id], onDelete: Cascade)
+  totalEarned Decimal  @default(0.00) @db.Decimal(15, 2)
+  createdAt   DateTime @default(now())
+
+  @@index([referrerId])
+  @@map("referrals")
+}
+
+model Session {
+  id     String @id // session token (64-char string)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // ข้อมูลสำหรับหน้าประวัติการใช้งาน (Security History)
+  userAgent String? @db.Text
+  ipAddress String?
+
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model OtpCode {
+  id        Int       @id @default(autoincrement())
+  phone     String
+  code      String
+  type      String // "login", "register"
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([phone])
+  @@map("otp_codes")
+}
+
+model activity_log {
+  id               BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  log_name         String?   @db.VarChar(255)
+  module           String?   @db.VarChar(100)
+  action           String?   @db.VarChar(100)
+  severity         String?   @db.VarChar(20)
+  description      String    @db.Text
+  subject_type     String?   @db.VarChar(255)
+  event            String?   @db.VarChar(255)
+  subject_id       BigInt?   @db.UnsignedBigInt
+  subject_table    String?   @db.VarChar(150)
+  subject_key      String?   @db.VarChar(150)
+  subject_label    String?   @db.VarChar(255)
+  causer_type      String?   @db.VarChar(255)
+  causer_id        BigInt?   @db.UnsignedBigInt
+  causer_name      String?   @db.VarChar(255)
+  actor_type       String?   @db.VarChar(50)
+  actor_label      String?   @db.VarChar(255)
+  request_id       String?   @db.VarChar(100)
+  source           String?   @db.VarChar(50)
+  route_name       String?   @db.VarChar(255)
+  method           String?   @db.VarChar(10)
+  url              String?   @db.Text
+  ip_address       String?   @db.VarChar(45)
+  properties       String?   @db.LongText
+  is_restorable    Boolean   @default(false)
+  restored_from_id BigInt?   @db.UnsignedBigInt
+  reverted_by      BigInt?   @db.UnsignedBigInt
+  reverted_at      DateTime? @db.Timestamp(0)
+  tags             String?   @db.LongText
+  event_at         DateTime? @db.Timestamp(0)
+  batch_uuid       String?   @db.Char(36)
+  created_at       DateTime? @db.Timestamp(0)
+  updated_at       DateTime? @db.Timestamp(0)
+
+  @@index([action], map: "activity_log_action_index")
+  @@index([actor_type], map: "activity_log_actor_type_index")
+  @@index([event_at], map: "activity_log_event_at_index")
+  @@index([ip_address], map: "activity_log_ip_address_index")
+  @@index([is_restorable], map: "activity_log_is_restorable_index")
+  @@index([log_name], map: "activity_log_log_name_index")
+  @@index([module], map: "activity_log_module_index")
+  @@index([request_id], map: "activity_log_request_id_index")
+  @@index([restored_from_id], map: "activity_log_restored_from_id_index")
+  @@index([reverted_by], map: "activity_log_reverted_by_index")
+  @@index([severity], map: "activity_log_severity_index")
+  @@index([source], map: "activity_log_source_index")
+  @@index([subject_key], map: "activity_log_subject_key_index")
+  @@index([subject_table], map: "activity_log_subject_table_index")
+  @@index([causer_type, causer_id], map: "causer")
+  @@index([subject_type, subject_id], map: "subject")
+}
+
+model admin_permission_overrides {
+  id              BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  admin_id        BigInt    @db.UnsignedBigInt
+  permission_name String    @db.VarChar(255)
+  guard_name      String    @default("web") @db.VarChar(255)
+  effect          String    @default("deny") @db.VarChar(255)
+  created_at      DateTime? @db.Timestamp(0)
+  updated_at      DateTime? @db.Timestamp(0)
+  employees       employees @relation(fields: [admin_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "admin_permission_overrides_admin_id_foreign")
+
+  @@unique([admin_id, permission_name, guard_name], map: "admin_permission_overrides_unique")
+  @@index([admin_id, effect], map: "admin_permission_overrides_admin_effect_index")
+}
+
+model auth_login_events {
+  id                   BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  authenticatable_type String    @db.VarChar(50)
+  authenticatable_id   BigInt?   @db.UnsignedBigInt
+  guard                String    @db.VarChar(50)
+  event                String    @db.VarChar(50)
+  status               String    @db.VarChar(30)
+  login_identifier     String?
+  failure_reason       String?   @db.VarChar(100)
+  ip                   String?   @db.VarChar(64)
+  user_agent           String?   @db.Text
+  device_type          String?   @db.VarChar(30)
+  platform             String?   @db.VarChar(30)
+  browser              String?   @db.VarChar(30)
+  session_id           String?   @db.VarChar(255)
+  request_id           String?   @db.VarChar(100)
+  source               String?   @db.VarChar(30)
+  remember_me          Boolean   @default(false)
+  occurred_at          DateTime? @db.Timestamp(0)
+  metadata             String?   @db.LongText
+  created_at           DateTime? @db.Timestamp(0)
+  updated_at           DateTime? @db.Timestamp(0)
+
+  @@index([authenticatable_type, authenticatable_id, occurred_at], map: "auth_login_events_auth_occ_idx")
+  @@index([event, occurred_at], map: "auth_login_events_event_occ_idx")
+  @@index([guard, occurred_at], map: "auth_login_events_guard_occ_idx")
+  @@index([ip, occurred_at], map: "auth_login_events_ip_occ_idx")
+  @@index([request_id], map: "auth_login_events_request_id_index")
+  @@index([session_id], map: "auth_login_events_session_id_index")
+  @@index([status, occurred_at], map: "auth_login_events_status_occ_idx")
+}
+
+model auth_sessions {
+  id                   BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  authenticatable_type String    @db.VarChar(50)
+  authenticatable_id   BigInt    @db.UnsignedBigInt
+  guard                String    @db.VarChar(50)
+  session_id           String?   @unique(map: "auth_sessions_session_id_unique") @db.VarChar(255)
+  ip                   String?   @db.VarChar(64)
+  user_agent           String?   @db.Text
+  device_type          String?   @db.VarChar(30)
+  platform             String?   @db.VarChar(30)
+  browser              String?   @db.VarChar(30)
+  logged_in_at         DateTime? @db.Timestamp(0)
+  last_seen_at         DateTime? @db.Timestamp(0)
+  logged_out_at        DateTime? @db.Timestamp(0)
+  is_active            Boolean   @default(true)
+  terminated_by_type   String?   @db.VarChar(50)
+  terminated_by_id     BigInt?   @db.UnsignedBigInt
+  terminate_reason     String?   @db.VarChar(100)
+  metadata             String?   @db.LongText
+  created_at           DateTime? @db.Timestamp(0)
+  updated_at           DateTime? @db.Timestamp(0)
+
+  @@index([authenticatable_type, authenticatable_id, is_active], map: "auth_sessions_auth_active_idx")
+  @@index([guard, is_active], map: "auth_sessions_guard_active_idx")
+  @@index([last_seen_at], map: "auth_sessions_last_seen_at_index")
+  @@index([logged_in_at], map: "auth_sessions_logged_in_at_index")
+}
+
+model cache {
+  key        String @id @db.VarChar(255)
+  value      String @db.MediumText
+  expiration Int
+}
+
+model cache_locks {
+  key        String @id @db.VarChar(255)
+  owner      String @db.VarChar(255)
+  expiration Int
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model core_settings {
+  id            BigInt             @id @default(autoincrement()) @db.UnsignedBigInt
+  group         String             @db.VarChar(50)
+  key           String             @unique(map: "core_settings_key_unique") @db.VarChar(120)
+  type          core_settings_type @default(string)
+  value_string  String?            @db.VarChar(255)
+  value_text    String?            @db.LongText
+  value_int     BigInt?
+  value_decimal Decimal?           @db.Decimal(18, 2)
+  value_bool    Boolean?
+  value_json    String?            @db.LongText
+  is_encrypted  Boolean            @default(false)
+  updated_by    String?            @db.VarChar(100)
+  created_at    DateTime?          @db.Timestamp(0)
+  updated_at    DateTime?          @db.Timestamp(0)
+
+  @@index([group], map: "core_settings_group_index")
+  @@index([type], map: "core_settings_type_index")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model employees {
+  id                                BigInt                       @id @default(autoincrement()) @db.UnsignedBigInt
+  parent_id                         BigInt?                      @db.UnsignedBigInt
+  name                              String                       @db.VarChar(100)
+  first_name                        String?                      @db.VarChar(100)
+  last_name                         String?                      @db.VarChar(100)
+  phone                             String?                      @db.VarChar(30)
+  line_id                           String?                      @db.VarChar(100)
+  username                          String                       @unique(map: "employees_username_unique") @db.VarChar(15)
+  password                          String                       @db.VarChar(255)
+  app_authentication_secret         String?                      @db.Text
+  app_authentication_recovery_codes String?                      @db.Text
+  locale                            String?                      @db.VarChar(5)
+  is_active                         Boolean                      @default(true)
+  created_at                        DateTime?                    @db.Timestamp(0)
+  updated_at                        DateTime?                    @db.Timestamp(0)
+  last_login_at                     DateTime?                    @db.Timestamp(0)
+  last_login_ip                     String?                      @db.VarChar(64)
+  admin_permission_overrides        admin_permission_overrides[]
+
+  @@index([is_active], map: "employees_is_active_index")
+  @@index([last_login_at], map: "employees_last_login_at_index")
+  @@index([locale], map: "employees_locale_index")
+  @@index([parent_id], map: "employees_parent_id_index")
+  @@index([phone], map: "employees_phone_index")
+}
+
+model failed_jobs {
+  id         BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid       String   @unique(map: "failed_jobs_uuid_unique") @db.VarChar(255)
+  connection String   @db.Text
+  queue      String   @db.Text
+  payload    String   @db.LongText
+  exception  String   @db.LongText
+  failed_at  DateTime @default(now()) @db.Timestamp(0)
+}
+
+model job_batches {
+  id             String  @id @db.VarChar(255)
+  name           String  @db.VarChar(255)
+  total_jobs     Int
+  pending_jobs   Int
+  failed_jobs    Int
+  failed_job_ids String  @db.LongText
+  options        String? @db.MediumText
+  cancelled_at   Int?
+  created_at     Int
+  finished_at    Int?
+}
+
+model jobs {
+  id           BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  queue        String @db.VarChar(255)
+  payload      String @db.LongText
+  attempts     Int    @db.UnsignedTinyInt
+  reserved_at  Int?   @db.UnsignedInt
+  available_at Int    @db.UnsignedInt
+  created_at   Int    @db.UnsignedInt
+
+  @@index([queue], map: "jobs_queue_index")
+}
+
+model migrations {
+  id        Int    @id @default(autoincrement()) @db.UnsignedInt
+  migration String @db.VarChar(255)
+  batch     Int
+}
+
+model model_has_permissions {
+  permission_id BigInt      @db.UnsignedBigInt
+  model_type    String      @db.VarChar(255)
+  model_id      BigInt      @db.UnsignedBigInt
+  permissions   permissions @relation(fields: [permission_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "model_has_permissions_permission_id_foreign")
+
+  @@id([permission_id, model_id, model_type])
+  @@index([model_id, model_type], map: "model_has_permissions_model_id_model_type_index")
+}
+
+model model_has_roles {
+  role_id    BigInt @db.UnsignedBigInt
+  model_type String @db.VarChar(255)
+  model_id   BigInt @db.UnsignedBigInt
+  roles      roles  @relation(fields: [role_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "model_has_roles_role_id_foreign")
+
+  @@id([role_id, model_id, model_type])
+  @@index([model_id, model_type], map: "model_has_roles_model_id_model_type_index")
+}
+
+model permissions {
+  id                    BigInt                  @id @default(autoincrement()) @db.UnsignedBigInt
+  name                  String                  @db.VarChar(255)
+  guard_name            String                  @db.VarChar(255)
+  created_at            DateTime?               @db.Timestamp(0)
+  updated_at            DateTime?               @db.Timestamp(0)
+  model_has_permissions model_has_permissions[]
+  role_has_permissions  role_has_permissions[]
+
+  @@unique([name, guard_name], map: "permissions_name_guard_name_unique")
+}
+
+model role_has_permissions {
+  permission_id BigInt      @db.UnsignedBigInt
+  role_id       BigInt      @db.UnsignedBigInt
+  permissions   permissions @relation(fields: [permission_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "role_has_permissions_permission_id_foreign")
+  roles         roles       @relation(fields: [role_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "role_has_permissions_role_id_foreign")
+
+  @@id([permission_id, role_id])
+  @@index([role_id], map: "role_has_permissions_role_id_foreign")
+}
+
+model roles {
+  id                   BigInt                 @id @default(autoincrement()) @db.UnsignedBigInt
+  name                 String                 @db.VarChar(255)
+  display_name         String?                @db.LongText
+  guard_name           String                 @db.VarChar(255)
+  created_at           DateTime?              @db.Timestamp(0)
+  updated_at           DateTime?              @db.Timestamp(0)
+  model_has_roles      model_has_roles[]
+  role_has_permissions role_has_permissions[]
+
+  @@unique([name, guard_name], map: "roles_name_guard_name_unique")
+}
+
+model telescope_entries {
+  sequence                BigInt                   @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid                    String                   @unique(map: "telescope_entries_uuid_unique") @db.Char(36)
+  batch_id                String                   @db.Char(36)
+  family_hash             String?                  @db.VarChar(255)
+  should_display_on_index Boolean                  @default(true)
+  type                    String                   @db.VarChar(20)
+  content                 String                   @db.LongText
+  created_at              DateTime?                @db.DateTime(0)
+  telescope_entries_tags  telescope_entries_tags[]
+
+  @@index([batch_id], map: "telescope_entries_batch_id_index")
+  @@index([created_at], map: "telescope_entries_created_at_index")
+  @@index([family_hash], map: "telescope_entries_family_hash_index")
+  @@index([type, should_display_on_index], map: "telescope_entries_type_should_display_on_index_index")
+}
+
+model telescope_entries_tags {
+  entry_uuid        String            @db.Char(36)
+  tag               String            @db.VarChar(255)
+  telescope_entries telescope_entries @relation(fields: [entry_uuid], references: [uuid], onDelete: Cascade, onUpdate: Restrict, map: "telescope_entries_tags_entry_uuid_foreign")
+
+  @@id([entry_uuid, tag])
+  @@index([tag], map: "telescope_entries_tags_tag_index")
+}
+
+model telescope_monitoring {
+  tag String @id @db.VarChar(255)
+}
+
+model translations {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  key        String
+  locale     String    @db.VarChar(10)
+  value      String    @db.Text
+  scope      String    @default("global") @db.VarChar(50)
+  theme      String?   @db.VarChar(100)
+  domain     String?   @db.VarChar(100)
+  is_active  Boolean   @default(true)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+
+  @@unique([key, locale, scope, theme, domain], map: "translations_unique_override")
+  @@index([domain, locale])
+  @@index([is_active])
+  @@index([key, locale])
+  @@index([scope, locale])
+  @@index([theme, locale])
+}
+
+enum core_settings_type {
+  bool
+  int
+  decimal
+  string
+  text
+  json
+}
