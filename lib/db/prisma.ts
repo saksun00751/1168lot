@@ -10,19 +10,20 @@ declare global {
 function createPrismaClient() {
   const dbUrl = new URL(process.env.DATABASE_URL!);
   const adapter = new PrismaMariaDb({
-    host: dbUrl.hostname,
-    port: Number(dbUrl.port || 3306),
-    user: dbUrl.username,
-    password: dbUrl.password,
-    database: dbUrl.pathname.slice(1),
-    connectionLimit: 5,
-    timezone: "+07:00",
+    host:            dbUrl.hostname,
+    port:            Number(dbUrl.port || 3306),
+    user:            dbUrl.username,
+    password:        dbUrl.password,
+    database:        dbUrl.pathname.slice(1),
+    connectionLimit: 10,   // max connections in pool
+    minimumIdle:     2,    // keep 2 connections always warm
+    idleTimeout:     60,   // close idle connection after 60s
+    timezone:        "+07:00",
   });
   return new PrismaClient({ adapter });
 }
 
 export const prisma = globalThis.prisma ?? createPrismaClient();
 
-if (process.env.NODE_ENV !== "production") {
-  globalThis.prisma = prisma;
-}
+// เก็บ singleton ทั้ง dev และ production เพื่อป้องกัน multiple instances
+globalThis.prisma = prisma;

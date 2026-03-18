@@ -1,5 +1,5 @@
 /**
- * middleware.ts  (Next.js Edge Middleware)
+ * proxy.ts  (Next.js Proxy — previously middleware)
  *
  * Protects authenticated routes by checking for the session cookie.
  * Note: MariaDB queries cannot run in Edge runtime, so we only check
@@ -22,7 +22,7 @@ const PROTECTED = [
 // Routes that logged-in users should not see (redirect to dashboard)
 const AUTH_ONLY = ["/login"];
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get(SESSION_COOKIE)?.value;
 
@@ -49,21 +49,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/",
-     "/spin/:path*",
-    "/api/:path*",
-    "/dashboard/:path*",
-    "/bet/:path*",
-    "/profile/:path*",
-    "/history/:path*",
-    "/transactions/:path*",
-    "/deposit/:path*",
-    "/withdraw/:path*",
-    "/change-password/:path*",
-    "/notifications/:path*",
-    "/security/:path*",
-    "/login",
-    "/register",
-   
+    "/((?!_next/static|_next/image|favicon.ico|icon.png).*)",
   ],
 };
