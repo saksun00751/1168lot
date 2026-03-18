@@ -15,6 +15,7 @@ model User {
   bankAccount  String?
   balance      Decimal   @default(0.00) @db.Decimal(15, 2)
   level        Int       @default(1)
+  diamond      Int       @default(0)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   sessions     Session[]
@@ -26,8 +27,247 @@ model User {
   referrals      Referral[] @relation("referrer")
   referredBy     Referral?  @relation("referee")
 
+  // Betting
+  betSlips     BetSlip[]
+  transactions Transaction[]
+  deposits     Deposit[]
+  withdrawals  Withdrawal[]
+
   @@index([referralCode])
   @@map("users")
+}
+
+// ─── หมวดหมู่หวย (เช่น หวยไทย, หวยต่างประเทศ, หวยหุ้น) ────────────────────
+model LotteryCategory {
+  id          String        @id @db.VarChar(50)
+  name        String        @db.VarChar(100)
+  emoji       String        @db.VarChar(10)
+  gradient    String        @db.VarChar(100)
+  badge       String        @db.VarChar(100)
+  sortOrder   Int           @default(0)
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  lotteryTypes LotteryType[]
+
+  @@map("lottery_categories")
+}
+
+// ─── ประเภทหวย (เช่น หวยรัฐบาล, ฮานอย พิเศษ, หุ้นไทย เช้า) ────────────────
+model LotteryType {
+  id              String          @id @db.VarChar(50)
+  categoryId      String          @db.VarChar(50)
+  category        LotteryCategory @relation(fields: [categoryId], references: [id])
+  name            String          @db.VarChar(100)
+  flag            String          @db.VarChar(10)
+  description     String?         @db.VarChar(200)
+  resultTime      String?         @db.VarChar(10)   // เวลาออกผล เช่น "17:00"
+  intervalMinutes Int?                               // สำหรับยี่กี (5 หรือ 15 นาที)
+  barClass        String          @db.VarChar(100)
+  sortOrder       Int             @default(0)
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  betRates             BetRate[]
+  rounds               LotteryRound[]
+  numberLimitTemplates NumberLimitTemplate[]
+
+  @@index([categoryId])
+  @@map("lottery_types")
+}
+
+// ─── อัตราจ่าย (ปรับได้แต่ละประเภทหวย) ──────────────────────────────────────
+model BetRate {
+  id            Int         @id @default(autoincrement())
+  lotteryTypeId String      @db.VarChar(50)
+  lotteryType   LotteryType @relation(fields: [lotteryTypeId], references: [id])
+  betType       BetType
+  payRate       Decimal     @db.Decimal(8, 2)   // อัตราจ่าย เช่น 900.00
+  minAmount     Decimal     @default(1.00)  @db.Decimal(10, 2)
+  maxAmount     Decimal     @default(1000.00) @db.Decimal(10, 2)
+  isActive      Boolean     @default(true)
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([lotteryTypeId, betType])
+  @@map("bet_rates")
+}
+
+// ─── งวดหวย / รอบหวย ──────────────────────────────────────────────────────────
+model LotteryRound {
+  id            String       @id @default(cuid())
+  lotteryTypeId String       @db.VarChar(50)
+  lotteryType   LotteryType  @relation(fields: [lotteryTypeId], references: [id])
+  roundNumber   Int?                            // เลขรอบ (ใช้กับยี่กี)
+  drawDate      DateTime                        // วันที่ออกผล
+  openAt        DateTime                        // เปิดรับแทง
+  closeAt       DateTime                        // ปิดรับแทง
+  status        RoundStatus  @default(open)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  result              LotteryResult?
+  betSlips            BetSlip[]
+  numberLimits        NumberLimit[]
+
+  @@index([lotteryTypeId, status])
+  @@index([closeAt])
+  @@map("lottery_rounds")
+}
+
+// ─── เลขอั้น template (ต่อประเภทหวย — ใช้เป็น default ทุกงวด) ────────────────
+model NumberLimitTemplate {
+  id            String      @id @default(cuid())
+  lotteryTypeId String      @db.VarChar(50)
+  lotteryType   LotteryType @relation(fields: [lotteryTypeId], references: [id], onDelete: Cascade)
+
+  number    String   @db.VarChar(3)     // "123", "45", "7"
+  betType   BetType?                    // null = ทุกประเภท
+  maxAmount Decimal? @db.Decimal(10, 2) // วงเงินสูงสุด; null = ปิดรับ
+  isClosed  Boolean  @default(false)
+  note      String?  @db.VarChar(200)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([lotteryTypeId, number])
+  @@map("number_limit_templates")
+}
+
+// ─── เลขอั้น (ต่องวด — override template ได้) ─────────────────────────────────
+model NumberLimit {
+  id      String       @id @default(cuid())
+  roundId String
+  round   LotteryRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  number    String   @db.VarChar(3)     // เลขที่อั้น
+  betType   BetType?                    // null = ทุกประเภทของงวดนี้
+  maxAmount Decimal? @db.Decimal(10, 2) // วงเงินสูงสุดต่อโต๊ด; null = ปิดรับ
+  isClosed  Boolean  @default(false)    // true = ปิดรับทั้งหมด
+  note      String?  @db.VarChar(200)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([roundId, number])
+  @@map("number_limits")
+}
+
+// ─── ผลหวย ────────────────────────────────────────────────────────────────────
+model LotteryResult {
+  id          String       @id @default(cuid())
+  roundId     String       @unique
+  round       LotteryRound @relation(fields: [roundId], references: [id])
+  top3        String       @db.Char(3)   // 3 ตัวบน
+  bot2        String       @db.Char(2)   // 2 ตัวล่าง
+  top2        String?      @db.Char(2)   // 2 ตัวบน
+  tod3        String?      @db.Char(3)   // 3 ตัวโต๊ด (กรณีต่างกัน)
+  resultAt    DateTime                   // เวลาออกผลจริง
+  announcedAt DateTime?                  // เวลาประกาศในระบบ
+  createdAt   DateTime     @default(now())
+
+  @@map("lottery_results")
+}
+
+// ─── ใบแทง (Slip) ─────────────────────────────────────────────────────────────
+model BetSlip {
+  id          String       @id @default(cuid())
+  slipNo      String       @unique @db.VarChar(20)  // เลขที่ใบแทง
+  userId      String
+  user        User         @relation(fields: [userId], references: [id])
+  roundId     String
+  round       LotteryRound @relation(fields: [roundId], references: [id])
+  totalAmount Decimal      @db.Decimal(12, 2)       // ยอดรวมทั้งใบ
+  totalPayout Decimal      @db.Decimal(12, 2)       // ยอดชนะสูงสุด (คำนวณตอนบันทึก)
+  note        String?      @db.VarChar(255)          // หมายเหตุ
+  status      SlipStatus   @default(pending)
+  createdAt   DateTime     @default(now())
+  confirmedAt DateTime?
+
+  items BetItem[]
+
+  @@index([userId, createdAt])
+  @@index([roundId])
+  @@index([status])
+  @@map("bet_slips")
+}
+
+// ─── รายการแทงแต่ละตัวเลขในใบแทง ─────────────────────────────────────────────
+model BetItem {
+  id           Int      @id @default(autoincrement())
+  slipId       String
+  slip         BetSlip  @relation(fields: [slipId], references: [id], onDelete: Cascade)
+  number       String   @db.VarChar(3)   // ตัวเลขที่แทง (1–3 หลัก)
+  betType      BetType
+  amount       Decimal  @db.Decimal(10, 2)   // ยอดแทง
+  payRate      Decimal  @db.Decimal(8, 2)    // อัตราจ่าย ณ เวลาแทง
+  payout       Decimal  @db.Decimal(12, 2)   // เงินที่จะได้ถ้าถูก (amount * payRate)
+  isWin        Boolean?                       // null = ยังไม่ออกผล
+  actualPayout Decimal? @db.Decimal(12, 2)   // เงินที่จ่ายจริง
+
+  @@index([slipId])
+  @@map("bet_items")
+}
+
+// ─── รายการเงิน ──────────────────────────────────────────────────────────────
+model Transaction {
+  id            String          @id @default(cuid())
+  userId        String
+  user          User            @relation(fields: [userId], references: [id])
+  type          TransactionType
+  amount        Decimal         @db.Decimal(12, 2)   // + เพิ่ม / - ลด
+  balanceBefore Decimal         @db.Decimal(15, 2)
+  balanceAfter  Decimal         @db.Decimal(15, 2)
+  referenceId   String?         @db.VarChar(50)      // slipNo / depositId ฯลฯ
+  note          String?         @db.VarChar(255)
+  status        TxStatus        @default(completed)
+  createdAt     DateTime        @default(now())
+
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("transactions")
+}
+
+// ─── รายการฝากเงิน ────────────────────────────────────────────────────────────
+model Deposit {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id])
+  amount      Decimal       @db.Decimal(12, 2)
+  bankName    String        @db.VarChar(50)
+  bankAccount String        @db.VarChar(20)
+  slipImage   String?       @db.VarChar(255)   // path ไฟล์สลิป
+  status      DepositStatus @default(pending)
+  approvedBy  String?       @db.VarChar(50)
+  note        String?       @db.VarChar(255)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("deposits")
+}
+
+// ─── รายการถอนเงิน ────────────────────────────────────────────────────────────
+model Withdrawal {
+  id           String           @id @default(cuid())
+  userId       String
+  user         User             @relation(fields: [userId], references: [id])
+  amount       Decimal          @db.Decimal(12, 2)
+  bankName     String           @db.VarChar(50)
+  bankAccount  String           @db.VarChar(20)
+  status       WithdrawalStatus @default(pending)
+  approvedBy   String?          @db.VarChar(50)
+  note         String?          @db.VarChar(255)
+  processedAt  DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("withdrawals")
 }
 
 model Referral {
@@ -413,4 +653,63 @@ enum core_settings_type {
   string
   text
   json
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum BetType {
+  top3     // 3 ตัวบน
+  tod3     // 3 ตัวโต๊ด
+  top2     // 2 ตัวบน
+  bot2     // 2 ตัวล่าง
+  run_top  // วิ่งบน
+  run_bot  // วิ่งล่าง
+}
+
+enum RoundStatus {
+  open       // เปิดรับแทง
+  closed     // ปิดรับแทง (รอออกผล)
+  resulted   // ออกผลแล้ว
+  cancelled  // ยกเลิก
+}
+
+enum SlipStatus {
+  pending    // รอยืนยัน
+  confirmed  // ยืนยันแล้ว
+  won        // ถูกรางวัล
+  lost       // ไม่ถูก
+  cancelled  // ยกเลิก
+  refunded   // คืนเงิน
+}
+
+enum TransactionType {
+  deposit          // ฝากเงิน
+  withdraw         // ถอนเงิน
+  bet              // แทงหวย (หักเงิน)
+  win              // ถูกรางวัล (เพิ่มเงิน)
+  refund           // คืนเงิน
+  commission       // ค่าคอมมิชชั่น
+  referral_bonus   // โบนัสแนะนำเพื่อน
+  adjustment       // ปรับยอด (โดย admin)
+}
+
+enum TxStatus {
+  pending
+  completed
+  failed
+  cancelled
+}
+
+enum DepositStatus {
+  pending   // รอตรวจสอบ
+  approved  // อนุมัติแล้ว
+  rejected  // ปฏิเสธ
+}
+
+enum WithdrawalStatus {
+  pending    // รอดำเนินการ
+  approved   // อนุมัติแล้ว
+  processing // กำลังโอน
+  completed  // โอนแล้ว
+  rejected   // ปฏิเสธ
 }

@@ -5,7 +5,7 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["var(--font-noto)", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
+        sans: ["var(--font-prompt)", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
       },
       colors: {
         ap: {

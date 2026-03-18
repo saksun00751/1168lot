@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
-import BetPage from "@/components/bet/BetPage";
+import LotteryLayoutPage from "@/components/bet/LotteryLayoutPage";
 import { requireAuth } from "@/lib/session/auth";
-import { CATEGORIES } from "@/lib/categories";
+import { getLotteryCategories, getNumberLimits, getBetRates, getPastResults } from "@/lib/db/lottery";
+import { getLotteryBetHistory } from "@/lib/db/bets";
+import type { BetSlipSummary } from "@/lib/db/bets";
 import type { Category } from "@/lib/categories";
 
 export const metadata: Metadata = { title: "แทงหวย — Lotto" };
@@ -16,8 +18,8 @@ const LOTTO_IDS  = ["thai", "foreign", "thai_stock", "foreign_stock"];
 const YEEKEE_IDS = ["yeekee_speed", "yeekee_super"];
 const GAME_IDS   = ["slot", "casino", "sport"];
 
-function byIds(ids: string[]) {
-  return ids.map((id) => CATEGORIES.find((c) => c.id === id)!).filter(Boolean);
+function byIds(all: Category[], ids: string[]) {
+  return ids.map((id) => all.find((c) => c.id === id)!).filter(Boolean);
 }
 
 function CategoryCard({ cat }: { cat: Category }) {
@@ -46,28 +48,57 @@ function CategoryCard({ cat }: { cat: Category }) {
 }
 
 export default async function BetRoute({ searchParams }: Props) {
-  const [user, params] = await Promise.all([requireAuth(), searchParams]);
+  const [user, params, allCategories] = await Promise.all([
+    requireAuth(),
+    searchParams,
+    getLotteryCategories(),
+  ]);
   const lottery = params?.lottery;
   const phone = user.phone.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
 
   // มี lottery param → แสดงหน้าแทงหวย
   if (lottery) {
+    const lotteryItem = allCategories.flatMap((c) => c.items).find((i) => i.id === lottery);
+    const categoryItem = allCategories.find((c) => c.items.some((i) => i.id === lottery));
+
+    const [numberLimits, betRates, myBetHistory, pastResults] = await Promise.all([
+      getNumberLimits(lottery),
+      getBetRates(lottery),
+      getLotteryBetHistory(user.id, lottery, 5),
+      getPastResults(lottery, 5),
+    ]);
+
+    const lotteryName  = lotteryItem?.name ?? lottery;
+    const lotteryFlag  = lotteryItem?.flag ?? "";
+    const categoryName = categoryItem?.label ?? "";
+    const closeAt      = lotteryItem?.closeAt;
+
     return (
       <div className="min-h-screen bg-ap-bg pb-20 sm:pb-8">
-        <Navbar balance={user.balance} userName={user.displayName ?? undefined} userPhone={phone} />
-        <BetPage defaultLottery={lottery} />
+        <Navbar balance={user.balance} diamond={user.diamond} userName={user.displayName ?? undefined} userPhone={phone} />
+        <LotteryLayoutPage
+          lotteryTypeId={lottery}
+          lotteryName={lotteryName}
+          lotteryFlag={lotteryFlag}
+          categoryName={categoryName}
+          closeAt={closeAt}
+          numberLimits={numberLimits}
+          betRates={betRates}
+          myBetHistory={myBetHistory}
+          pastResults={pastResults}
+        />
       </div>
     );
   }
 
   // ไม่มี lottery param → แสดงหน้าเลือกหมวดหมู่
-  const lottoCategories  = byIds(LOTTO_IDS);
-  const yeekeeCategories = byIds(YEEKEE_IDS);
-  const gameCategories   = byIds(GAME_IDS);
+  const lottoCategories  = byIds(allCategories, LOTTO_IDS);
+  const yeekeeCategories = byIds(allCategories, YEEKEE_IDS);
+  const gameCategories   = byIds(allCategories, GAME_IDS);
 
   return (
     <div className="min-h-screen bg-ap-bg pb-20 sm:pb-8">
-      <Navbar balance={user.balance} userName={user.displayName ?? undefined} userPhone={phone} />
+      <Navbar balance={user.balance} diamond={user.diamond} userName={user.displayName ?? undefined} userPhone={phone} />
       <div className="max-w-5xl mx-auto px-5 pt-6 space-y-8">
 
         <div>

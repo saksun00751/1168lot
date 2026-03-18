@@ -11,7 +11,7 @@ export default async function WithdrawRoute() {
 
   return (
     <div className="min-h-screen bg-ap-bg pb-20 sm:pb-8">
-      <Navbar balance={user.balance} userName={user.displayName ?? undefined} userPhone={phone} />
+      <Navbar balance={user.balance} diamond={user.diamond} userName={user.displayName ?? undefined} userPhone={phone} />
       <WithdrawPage
         displayName={user.displayName ?? "สมาชิก"}
         bankName={user.bankName}

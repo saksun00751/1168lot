@@ -2,29 +2,31 @@ import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
 import CompleteProfileModal from "@/components/profile/CompleteProfileModal";
 import RefreshButton from "@/components/dashboard/RefreshButton";
+import LastUpdated from "@/components/ui/LastUpdated";
 import { requireAuth } from "@/lib/session/auth";
-import { CATEGORIES } from "@/lib/categories";
+import { getLotteryCategories } from "@/lib/db/lottery";
+import { getReferralStats, getMonthlyReferralEarning } from "@/lib/db/referrals";
 import type { Category } from "@/lib/categories";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "หน้าหลัก — Lotto" };
 
-const payoutRates = [
-  { label: "3 ตัวบน", rate: "900", emoji: "🏆" },
-  { label: "3 ตัวโต๊ด", rate: "150", emoji: "🎲" },
-  { label: "2 ตัวบน", rate: "95", emoji: "⭐" },
-  { label: "2 ตัวล่าง", rate: "95", emoji: "✨" },
-  { label: "วิ่งบน", rate: "3.5", emoji: "💨" },
-  { label: "วิ่งล่าง", rate: "4.5", emoji: "💫" },
-];
+// const payoutRates = [
+//   { label: "3 ตัวบน", rate: "900", emoji: "🏆" },
+//   { label: "3 ตัวโต๊ด", rate: "150", emoji: "🎲" },
+//   { label: "2 ตัวบน", rate: "95", emoji: "⭐" },
+//   { label: "2 ตัวล่าง", rate: "95", emoji: "✨" },
+//   { label: "วิ่งบน", rate: "3.5", emoji: "💨" },
+//   { label: "วิ่งล่าง", rate: "4.5", emoji: "💫" },
+// ];
 
 // ─── Groupings ─────────────────────────────────────────────────────────────────
 const LOTTO_IDS    = ["thai", "foreign", "thai_stock", "foreign_stock"];
 const YEEKEE_IDS   = ["yeekee_speed", "yeekee_super"];
 const GAME_IDS     = ["slot", "casino", "sport"];
 
-function byIds(ids: string[]) {
-  return ids.map((id) => CATEGORIES.find((c) => c.id === id)!).filter(Boolean);
+function byIds(all: Category[], ids: string[]) {
+  return ids.map((id) => all.find((c) => c.id === id)!).filter(Boolean);
 }
 
 // ─── Category card ─────────────────────────────────────────────────────────────
@@ -65,14 +67,18 @@ function CategoryCard({ cat, size = "md" }: { cat: Category; size?: "md" | "lg" 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default async function DashboardPage() {
   const user = await requireAuth();
+  const [allCategories, referralStats, monthlyEarning] = await Promise.all([
+    getLotteryCategories(),
+    getReferralStats(user.id),
+    getMonthlyReferralEarning(user.id),
+  ]);
+
   const needsProfile = !user.bankAccount;
   const phone = user.phone.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
 
-  const lottoCategories  = byIds(LOTTO_IDS);
-  const yeekeeCategories = byIds(YEEKEE_IDS);
-  const gameCategories   = byIds(GAME_IDS);
-
-  const totalOpen = CATEGORIES.flatMap((c) => c.items).filter((i) => i.isOpen).length;
+  const lottoCategories  = byIds(allCategories, LOTTO_IDS);
+  const yeekeeCategories = byIds(allCategories, YEEKEE_IDS);
+  const gameCategories   = byIds(allCategories, GAME_IDS);
 
   return (
     <div className="min-h-screen bg-ap-bg pb-20 sm:pb-8">
@@ -106,12 +112,7 @@ export default async function DashboardPage() {
 
           {/* Updated time */}
           <div className="relative px-4 pb-3">
-            <span className="text-white/60 text-[14px]">
-              ข้อมูลอัพเดทเมื่อ{" "}
-              {new Date().toLocaleDateString("th-TH", { day: "2-digit", month: "2-digit", year: "numeric" })}
-              {" "}
-              {new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
-            </span>
+            <LastUpdated />
           </div>
 
           {/* 4-quadrant grid */}
@@ -129,7 +130,7 @@ export default async function DashboardPage() {
 
             {/* Top-right: Diamond */}
             <div className="p-4 flex flex-col items-center justify-center gap-0.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.15)" }}>
-              <span className="text-white text-[20px] font-bold tabular-nums">0</span>
+              <span className="text-white text-[20px] font-bold tabular-nums"> {user.diamond}</span>
               <span className="text-white/70 text-[11px]">Diamond</span>
             </div>
 
@@ -141,8 +142,8 @@ export default async function DashboardPage() {
 
             {/* Bottom-right: แนะนำ / ยอดเดือนนี้ */}
             <div className="p-4 flex flex-col items-center justify-center gap-0.5">
-              <span className="text-white/70 text-[14px]">แนะนำ <span className="text-white font-bold">0</span></span>
-              <span className="text-white/70 text-[14px]">ยอดเดือนนี้ <span className="text-white font-bold">0.00</span></span>
+              <span className="text-white/70 text-[14px]">แนะนำ <span className="text-white font-bold">{referralStats.referredCount}</span></span>
+              <span className="text-white/70 text-[14px]">ยอดเดือนนี้ <span className="text-white font-bold">{monthlyEarning.toFixed(2)}</span></span>
             </div>
           </div>
         </div>

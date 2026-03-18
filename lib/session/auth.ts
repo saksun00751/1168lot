@@ -16,9 +16,11 @@ export interface AuthUser {
   displayName: string | null;
   balance:     number;
   level:       User["level"];
+  diamond:     User["diamond"];
   createdAt:   Date;
-  bankName:    string | null;
-  bankAccount: string | null;
+  bankName:     string | null;
+  bankAccount:  string | null;
+  referralCode: string | null;
 }
 
 /**
@@ -45,9 +47,11 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       displayName: user.displayName,
       balance:     parseFloat(String(user.balance)),
       level:       user.level,
+      diamond:     user.diamond,
       createdAt:   user.createdAt,
-      bankName:    user.bankName,
-      bankAccount: user.bankAccount,
+      bankName:     user.bankName,
+      bankAccount:  user.bankAccount,
+      referralCode: user.referralCode,
     };
   } catch (error) {
     console.error("Authentication check failed:", error);

@@ -28,6 +28,23 @@ export async function getReferralStats(userId: string): Promise<{
   };
 }
 
+/** ยอดค่าแนะนำที่ได้รับในเดือนปัจจุบัน */
+export async function getMonthlyReferralEarning(userId: string): Promise<number> {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const result = await prisma.transaction.aggregate({
+    where: {
+      userId,
+      type:      "referral_bonus",
+      status:    "completed",
+      createdAt: { gte: startOfMonth },
+    },
+    _sum: { amount: true },
+  });
+  return parseFloat(String(result._sum.amount ?? 0));
+}
+
 /** Get list of referred users with joined date */
 export async function getReferralList(userId: string) {
   return prisma.referral.findMany({

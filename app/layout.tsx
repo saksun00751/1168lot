@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
-import { Noto_Sans_Thai } from "next/font/google";
+import { Prompt } from "next/font/google";
 import ContactFAB from "@/components/ui/ContactFAB";
+import ProgressBar from "@/components/ui/ProgressBar";
 import "./globals.css";
 
-const noto = Noto_Sans_Thai({
+const prompt = Prompt({
   subsets: ["thai", "latin"],
   weight: ["300", "400", "500", "600", "700", "800"],
-  variable: "--font-noto",
+  variable: "--font-prompt",
   display: "swap",
 });
 
@@ -15,12 +16,19 @@ export const metadata: Metadata = {
   description: "หวยออนไลน์",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="th" className={noto.variable}>
+    <html lang="th" className={prompt.variable}>
       <body className="font-sans bg-ap-bg">
+        <ProgressBar />
         {children}
-        <ContactFAB />
+        {/* <ContactFAB /> */}
       </body>
     </html>
   );

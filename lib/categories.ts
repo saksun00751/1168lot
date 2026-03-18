@@ -5,10 +5,11 @@ export interface SubItem {
   flag: string;
   sub: string;
   isOpen: boolean;
-  countdown?: string;
+  closeAt?: string;     // ISO 8601 string — ใช้แทน countdown string
+  countdown?: string;   // fallback สำหรับ hardcode data
   result?: { top3: string; bot2: string };
   barClass: string;
-  href: string; // links to /bet?lottery=id
+  href: string;
 }
 
 // ─── Main category ─────────────────────────────────────────────────────────────

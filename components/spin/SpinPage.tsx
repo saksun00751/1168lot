@@ -3,6 +3,8 @@ import { useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
 import CompleteProfileModal from "@/components/profile/CompleteProfileModal";
+import { spinWheelAction } from "@/lib/actions";
+import type { AuthUser } from "@/lib/session/auth";
 
 const NUM_SEGMENTS = 10;
 const SEGMENT_ANGLE = 360 / NUM_SEGMENTS;
@@ -30,42 +32,51 @@ function slicePath(startDeg: number, endDeg: number) {
   return `M${CX},${CY} L${s.x},${s.y} A${R},${R},0,0,1,${e.x},${e.y} Z`;
 }
 
-export default function SpinPage({ user }: { user: any }) {
+export default function SpinPage({ user }: { user: AuthUser }) {
   const displayName = user.displayName ?? "สมาชิก";
   const phone = formatPhone(user.phone);
   const needsProfile = !user.bankAccount;
 
-  const [rotation, setRotation] = useState(0);
+  const [rotation, setRotation]   = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
-  const [winner, setWinner] = useState<number | null>(null);
+  const [winnerIndex, setWinnerIndex] = useState<number | null>(null);
+  const [diamond, setDiamond]     = useState(user.diamond);
+  const [error, setError]         = useState<string | null>(null);
 
-  const handleSpin = () => {
-    if (isSpinning) return;
+  const handleSpin = async () => {
+    if (isSpinning || diamond < 1) return;
     setIsSpinning(true);
-    setWinner(null);
+    setWinnerIndex(null);
+    setError(null);
 
+    // คำนวณองศาก่อน แล้วค่อย call server action พร้อมกัน
     const index = Math.floor(Math.random() * NUM_SEGMENTS);
-
-    // คำนวณองศาที่ต้องหมุนให้ segment index หยุดตรง pointer (บน)
     const targetPos = index * SEGMENT_ANGLE + SEGMENT_ANGLE / 2;
     const needed = (360 - targetPos) % 360;
     const currentMod = ((rotation % 360) + 360) % 360;
     let extra = (needed - currentMod + 360) % 360;
     if (extra === 0) extra = 360;
     const newRotation = rotation + 5 * 360 + extra;
-
     setRotation(newRotation);
+
+    // call server action พร้อมกับหมุน
+    const result = await spinWheelAction();
 
     setTimeout(() => {
       setIsSpinning(false);
-      setWinner(index);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setWinnerIndex(index);
+        if (result.diamond !== undefined) setDiamond(result.diamond);
+      }
     }, 4500);
   };
 
   return (
     <>
       <CompleteProfileModal open={needsProfile} currentDisplayName={user.displayName} />
-      <Navbar balance={user.balance} userName={displayName} userPhone={phone} />
+      <Navbar balance={user.balance} diamond={diamond} userName={displayName} userPhone={phone} />
       <main className="min-h-screen bg-ap-bg flex flex-col items-center justify-center p-5 pt-6 pb-24 sm:pb-8">
         <div className="w-full max-w-md">
 
@@ -76,16 +87,21 @@ export default function SpinPage({ user }: { user: any }) {
 
           <div className="bg-white rounded-2xl shadow-card-xl border border-ap-border p-6 flex flex-col items-center gap-5">
 
-            <div className="w-full flex justify-start">
+            <div className="w-full flex items-center justify-between">
               <Link href="/dashboard"
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-ap-bg border border-ap-border text-ap-secondary text-[13px] hover:bg-ap-blue/5 transition-colors">
                 ← กลับหน้าหลัก
               </Link>
+              {/* Diamond counter */}
+              <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-3 py-1.5">
+                <span className="text-[16px]">💎</span>
+                <span className="text-[14px] font-bold text-ap-blue tabular-nums">{diamond}</span>
+                <span className="text-[11px] text-ap-secondary">Diamond</span>
+              </div>
             </div>
 
             {/* Wheel + pointer */}
             <div className="relative">
-              {/* Pointer */}
               <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-3 z-20">
                 <svg width="22" height="30" viewBox="0 0 22 30">
                   <polygon points="11,30 0,6 22,6" fill="#EF4444" />
@@ -93,83 +109,76 @@ export default function SpinPage({ user }: { user: any }) {
                 </svg>
               </div>
 
-              {/* Outer ring */}
               <div className="rounded-full p-1.5 bg-gradient-to-br from-yellow-400 to-amber-600 shadow-xl">
                 <svg
-                  width="320"
-                  height="320"
-                  viewBox="0 0 320 320"
+                  width="320" height="320" viewBox="0 0 320 320"
                   style={{
                     transform: `rotate(${rotation}deg)`,
-                    transition: isSpinning
-                      ? "transform 4.5s cubic-bezier(0.17, 0.67, 0.12, 1)"
-                      : "none",
+                    transition: isSpinning ? "transform 4.5s cubic-bezier(0.17, 0.67, 0.12, 1)" : "none",
                   }}
                 >
                   {PRIZES.map((prize, i) => {
-                    const start = i * SEGMENT_ANGLE;
-                    const end = (i + 1) * SEGMENT_ANGLE;
-                    const mid = start + SEGMENT_ANGLE / 2;
+                    const start   = i * SEGMENT_ANGLE;
+                    const end     = (i + 1) * SEGMENT_ANGLE;
+                    const mid     = start + SEGMENT_ANGLE / 2;
                     const textPos = polarToXY(mid, R * 0.65);
-
                     return (
                       <g key={i}>
-                        <path
-                          d={slicePath(start, end)}
-                          fill={COLORS[i]}
-                          stroke="white"
-                          strokeWidth="1.5"
-                        />
+                        <path d={slicePath(start, end)} fill={COLORS[i]} stroke="white" strokeWidth="1.5" />
                         <text
-                          x={textPos.x}
-                          y={textPos.y}
+                          x={textPos.x} y={textPos.y} dy="0.35em"
                           textAnchor="middle"
-                          dominantBaseline="middle"
-                          fill="white"
-                          fontSize="12"
-                          fontWeight="bold"
+                          fill="white" fontSize="13" fontWeight="bold"
+                          fontFamily="Arial, sans-serif"
                           transform={`rotate(${mid}, ${textPos.x}, ${textPos.y})`}
-                          style={{ filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.6))" }}
+                          style={{ filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.5))" }}
                         >
-                          ฿{prize}
+                          {`\u0E3F${prize}`}
                         </text>
                       </g>
                     );
                   })}
-
-                  {/* Center hub */}
                   <circle cx={CX} cy={CY} r="26" fill="white" stroke="#3B82F6" strokeWidth="3" />
-                  <text x={CX} y={CY} textAnchor="middle" dominantBaseline="middle"
-                    fontSize="9" fontWeight="bold" fill="#3B82F6">
+                  <text x={CX} y={CY} dy="0.35em"
+                    textAnchor="middle"
+                    fontSize="10" fontWeight="bold" fill="#3B82F6"
+                    fontFamily="Arial, sans-serif">
                     SPIN
                   </text>
                 </svg>
               </div>
             </div>
 
-            {/* Winner result */}
-            {winner !== null && !isSpinning && (
-              <div className="w-full bg-green-50 border border-green-200 rounded-2xl p-4 text-center animate-fade-up">
+            {/* Result */}
+            {winnerIndex !== null && !isSpinning && (
+              <div className="w-full bg-green-50 border border-green-200 rounded-2xl p-4 text-center">
                 <div className="text-[28px] mb-1">🎉</div>
                 <p className="text-[16px] font-bold text-green-700">ยินดีด้วย!</p>
                 <p className="text-[13px] text-ap-secondary mt-0.5">
                   คุณได้รับ{" "}
                   <span className="font-bold text-ap-primary text-[16px]">
-                    ฿{PRIZES[winner].toLocaleString()}
+                    ฿{PRIZES[winnerIndex].toLocaleString()}
                   </span>
                 </p>
               </div>
             )}
 
+            {/* Error */}
+            {error && (
+              <div className="w-full bg-red-50 border border-red-200 rounded-2xl p-3 text-center text-[13px] text-red-600 font-medium">
+                {error}
+              </div>
+            )}
+
             <button
               onClick={handleSpin}
-              disabled={isSpinning}
-              className="w-full bg-ap-blue text-white font-bold py-3 rounded-xl text-[15px] disabled:opacity-60 hover:bg-ap-blue-h transition-colors active:scale-[0.98]"
+              disabled={isSpinning || diamond < 1}
+              className="w-full bg-ap-blue text-white font-bold py-3 rounded-xl text-[15px] disabled:opacity-50 hover:bg-ap-blue-h transition-colors active:scale-[0.98]"
             >
-              {isSpinning ? "กำลังหมุน..." : "หมุนเลย! 🎰"}
+              {isSpinning ? "กำลังหมุน..." : diamond < 1 ? "💎 ไม่มี Diamond" : "หมุนเลย! 🎰 (1 💎)"}
             </button>
-          </div>
 
+          </div>
         </div>
       </main>
     </>

@@ -7,12 +7,14 @@ import { logoutAction } from "@/lib/actions";
 
 interface NavbarProps {
   balance?: number;
+  diamond?: number;
   userName?: string;
   userPhone?: string;
 }
 
 export default function Navbar({
   balance = 6.19,
+  diamond = 0,
   userName = "สมาชิก",
   userPhone = "098-7XX-XXXX",
 }: NavbarProps) {
@@ -35,7 +37,7 @@ export default function Navbar({
     { href: "/deposit",   label: "เติมเงิน",  icon: "💰" },
     { href: "/bet",       label: "แทงหวย",   icon: "🎯" },
     { href: "/withdraw",  label: "ถอนเงิน",  icon: "💸" },
-    { href: "/profile",   label: "สมาชิก",   icon: "👤" },
+    { href: "/contact",   label: "ติดต่อ",    icon: "💬" },
   ];
 
   const profileMenuItems = [
@@ -51,7 +53,7 @@ export default function Navbar({
   return (
     <>
       <nav className="sticky top-0 z-50 bg-white/85 backdrop-blur-xl border-b border-ap-border">
-        <div className="max-w-5xl mx-auto px-5 h-[56px] flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-3 sm:px-5 h-[52px] sm:h-[56px] flex items-center justify-between gap-2">
 
           {/* Logo */}
           <Link href="/dashboard" className="flex items-center group flex-shrink-0">
@@ -74,13 +76,20 @@ export default function Navbar({
           </div>
 
           {/* Right side */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1.5 sm:gap-2.5">
+            {/* Diamond chip — desktop only */}
+            <Link href="/spin"
+              className="hidden sm:flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-3 py-1.5 hover:border-ap-blue/50 transition-colors">
+              <span className="text-[13px]">💎</span>
+              <span className="text-[13px] font-semibold text-ap-blue tabular-nums">{diamond}</span>
+            </Link>
+
             {/* Balance chip */}
             <Link href="/deposit"
-              className="flex items-center gap-2 bg-ap-bg border border-ap-border rounded-full px-3.5 py-1.5 hover:border-ap-blue/30 transition-colors">
+              className="flex items-center gap-1.5 bg-ap-bg border border-ap-border rounded-full px-2.5 sm:px-3.5 py-1.5 hover:border-ap-blue/30 transition-colors">
               <span className="text-[13px]">💰</span>
-              <span className="text-[13px] font-semibold text-ap-primary tabular-nums">฿{balance.toFixed(2)}</span>
-              <span className="text-[11px] text-ap-blue font-medium">+ เติม</span>
+              <span className="text-[12px] sm:text-[13px] font-semibold text-ap-primary tabular-nums">฿{balance.toFixed(2)}</span>
+              <span className="hidden sm:inline text-[11px] text-ap-blue font-medium">+ เติม</span>
             </Link>
 
             {/* Avatar + dropdown */}
@@ -107,10 +116,14 @@ export default function Navbar({
                         <p className="text-[12px] text-ap-tertiary">{userPhone}</p>
                       </div>
                     </div>
-                    {/* Balance in dropdown */}
+                    {/* Balance + Diamond in dropdown */}
                     <div className="mt-3 flex items-center justify-between bg-white rounded-xl px-3 py-2 border border-ap-border">
                       <span className="text-[12px] text-ap-secondary">ยอดคงเหลือ</span>
                       <span className="text-[14px] font-bold text-ap-blue tabular-nums">฿{balance.toFixed(2)}</span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between bg-blue-50 rounded-xl px-3 py-2 border border-blue-100">
+                      <span className="text-[12px] text-ap-secondary">Diamond คงเหลือ</span>
+                      <span className="text-[14px] font-bold text-ap-blue tabular-nums">💎 {diamond}</span>
                     </div>
                   </div>
 
@@ -154,16 +167,17 @@ export default function Navbar({
       </nav>
 
       {/* Mobile bottom tabs */}
-      <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-ap-border z-40">
-        <div className="flex">
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-ap-border z-50"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+        <div className="grid w-full" style={{ gridTemplateColumns: `repeat(${navLinks.length}, 1fr)` }}>
           {navLinks.map((l) => {
             const active = pathname === l.href || pathname.startsWith(l.href + "/");
             return (
               <Link key={l.href} href={l.href}
-                className={["flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium transition-colors",
+                className={["flex flex-col items-center justify-center gap-0.5 py-1.5 min-w-0 transition-colors active:scale-95",
                   active ? "text-ap-blue" : "text-ap-tertiary"].join(" ")}>
-                <span className="text-[20px] leading-none">{l.icon}</span>
-                {l.label}
+                <span className="text-[22px] leading-none">{l.icon}</span>
+                <span className={["text-[14px] truncate w-full text-center px-0.5 leading-tight", active ? "font-bold" : "font-medium"].join(" ")}>{l.label}</span>
               </Link>
             );
           })}

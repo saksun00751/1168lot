@@ -16,6 +16,7 @@ function createPrismaClient() {
     password: dbUrl.password,
     database: dbUrl.pathname.slice(1),
     connectionLimit: 5,
+    timezone: "+07:00",
   });
   return new PrismaClient({ adapter });
 }

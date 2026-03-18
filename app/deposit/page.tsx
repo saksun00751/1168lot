@@ -11,7 +11,7 @@ export default async function DepositRoute() {
 
   return (
     <div className="min-h-screen bg-ap-bg pb-20 sm:pb-8">
-      <Navbar balance={user.balance} userName={user.displayName ?? undefined} userPhone={phone} />
+      <Navbar balance={user.balance} diamond={user.diamond} userName={user.displayName ?? undefined} userPhone={phone} />
       <DepositPage
         displayName={user.displayName ?? "สมาชิก"}
         bankName={user.bankName}

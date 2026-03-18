@@ -4,6 +4,9 @@ import CompleteProfileModal from "@/components/profile/CompleteProfileModal";
 import RefreshButton from "@/components/dashboard/RefreshButton";
 import { requireAuth } from "@/lib/session/auth";
 import { logoutAction } from "@/lib/actions";
+import { getUserStats } from "@/lib/db/stats";
+import { getBetHistory } from "@/lib/db/bets";
+import LastUpdated from "@/components/ui/LastUpdated";
 
 export const metadata: Metadata = { title: "ข้อมูลสมาชิก — Lotto" };
 
@@ -38,18 +41,22 @@ const menuSections = [
 
 export default async function ProfilePage() {
   const user = await requireAuth();
+  const [stats, { slips: betHistory }] = await Promise.all([
+    getUserStats(user.id),
+    getBetHistory(user.id, { limit: 5 }),
+  ]);
 
   const displayName = user.displayName ?? "สมาชิก";
   const phone       = formatPhone(user.phone);
 
   const statCards = [
-    { label: "ยอดแทงรวม",   value: "฿0",        icon: "🎯", color: "text-ap-blue"   },
-    { label: "ยอดชนะรวม",   value: "฿0",        icon: "🏆", color: "text-ap-green"  },
-    { label: "ระดับสมาชิก", value: user.level,  icon: "⭐", color: "text-ap-orange" },
+    { label: "ยอดแทงรวม",   value: `฿${stats.totalBet.toFixed(2)}`,  icon: "🎯", color: "text-ap-blue"   },
+    { label: "ยอดชนะรวม",   value: `฿${stats.totalWin.toFixed(2)}`,  icon: "🏆", color: "text-ap-green"  },
+    { label: "ระดับสมาชิก", value: user.level,                        icon: "⭐", color: "text-ap-orange" },
   ];
 
   const needsProfile = !user.bankAccount;
-  const referralCode = "LT" + user.id.replace(/-/g, "").slice(0, 6).toUpperCase();
+  const referralCode = user.referralCode ?? ("LT" + user.id.replace(/-/g, "").slice(0, 6).toUpperCase());
 
   /** Mask bank account: show only last 4 digits */
   function maskAccount(acc: string) {
@@ -59,7 +66,7 @@ export default async function ProfilePage() {
   return (
     <div className="min-h-screen bg-ap-bg pb-20 sm:pb-8">
       <CompleteProfileModal open={needsProfile} currentDisplayName={user.displayName} />
-      <Navbar balance={user.balance} userName={displayName} userPhone={phone} />
+      <Navbar balance={user.balance} diamond={user.diamond} userName={displayName} userPhone={phone} />
 
       <div className="max-w-2xl mx-auto px-5 pt-6 space-y-5">
 
@@ -89,12 +96,7 @@ export default async function ProfilePage() {
 
           {/* Updated time */}
           <div className="relative px-4 pb-3">
-            <span className="text-white/60 text-[14px]">
-              ข้อมูลอัพเดทเมื่อ{" "}
-              {new Date().toLocaleDateString("th-TH", { day: "2-digit", month: "2-digit", year: "numeric" })}
-              {" "}
-              {new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
-            </span>
+            <LastUpdated />
           </div>
 
           {/* 4-quadrant grid */}
@@ -112,7 +114,7 @@ export default async function ProfilePage() {
 
             {/* Top-right: Diamond */}
             <div className="p-4 flex flex-col items-center justify-center gap-0.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.15)" }}>
-              <span className="text-white text-[20px] font-bold tabular-nums">0</span>
+              <span className="text-white text-[20px] font-bold tabular-nums">💎 {user.diamond}</span>
               <span className="text-white/70 text-[11px]">Diamond</span>
             </div>
 
@@ -124,8 +126,8 @@ export default async function ProfilePage() {
 
             {/* Bottom-right: แนะนำ / ยอดเดือนนี้ */}
             <div className="p-4 flex flex-col items-center justify-center gap-0.5">
-              <span className="text-white/70 text-[14px]">แนะนำ <span className="text-white font-bold">0</span></span>
-              <span className="text-white/70 text-[14px]">ยอดเดือนนี้ <span className="text-white font-bold">0.00</span></span>
+              <span className="text-white/70 text-[14px]">แนะนำ <span className="text-white font-bold">{stats.referredCount}</span></span>
+              <span className="text-white/70 text-[14px]">ยอดเดือนนี้ <span className="text-white font-bold">{stats.monthlyReferral.toFixed(2)}</span></span>
             </div>
           </div>
         </div>
@@ -233,6 +235,57 @@ export default async function ProfilePage() {
             </div>
           </div>
         </a>
+
+        {/* ประวัติการแทงล่าสุด */}
+        <div className="bg-white rounded-2xl border border-ap-border shadow-card overflow-hidden">
+          <div className="px-5 py-3 border-b border-ap-border flex items-center justify-between">
+            <p className="text-[14px] font-bold text-ap-primary">📋 ประวัติการแทงล่าสุด</p>
+            <a href="/history" className="text-[12px] text-ap-blue font-semibold hover:underline">ดูทั้งหมด →</a>
+          </div>
+          {betHistory.length === 0 ? (
+            <div className="py-8 text-center">
+              <p className="text-[13px] text-ap-tertiary">ยังไม่มีประวัติการแทง</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-ap-border">
+              {betHistory.map((slip) => {
+                const statusStyle: Record<string, string> = {
+                  confirmed: "bg-ap-blue/10 text-ap-blue",
+                  won:       "bg-ap-green/10 text-ap-green",
+                  lost:      "bg-ap-red/10 text-ap-red",
+                  pending:   "bg-yellow-50 text-yellow-700",
+                  cancelled: "bg-ap-bg text-ap-tertiary",
+                  refunded:  "bg-ap-bg text-ap-secondary",
+                };
+                const statusLabel: Record<string, string> = {
+                  confirmed: "ยืนยัน", won: "ถูกรางวัล", lost: "ไม่ถูก",
+                  pending: "รอยืนยัน", cancelled: "ยกเลิก", refunded: "คืนเงิน",
+                };
+                const date = slip.createdAt.toLocaleDateString("th-TH", { day: "2-digit", month: "2-digit", year: "2-digit" });
+                const time = slip.createdAt.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+                return (
+                  <div key={slip.id} className="px-5 py-3 flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-[13px] font-bold text-ap-primary">{slip.lotteryName}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusStyle[slip.status] ?? "bg-ap-bg text-ap-secondary"}`}>
+                          {statusLabel[slip.status] ?? slip.status}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-ap-tertiary">{date} {time} · {slip.itemCount} รายการ · #{slip.slipNo}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-[14px] font-bold text-ap-primary tabular-nums">฿{slip.totalAmount.toLocaleString("th-TH")}</p>
+                      {slip.status === "won" && (
+                        <p className="text-[11px] font-bold text-ap-green tabular-nums">+฿{slip.totalPayout.toLocaleString("th-TH")}</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         {/* Menu sections */}
         {menuSections.map((section) => (

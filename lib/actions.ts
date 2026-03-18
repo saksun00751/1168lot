@@ -276,6 +276,17 @@ export async function logoutAction(): Promise<void> {
 }
 
 // ─── Place Bet ────────────────────────────────────────────────────────────────
+
+// Frontend BetType → Prisma enum
+const BET_TYPE_MAP: Record<string, "top3" | "tod3" | "top2" | "bot2" | "run_top" | "run_bot"> = {
+  "3top":    "top3",
+  "3tod":    "tod3",
+  "2top":    "top2",
+  "2bot":    "bot2",
+  "run_top": "run_top",
+  "run_bot": "run_bot",
+};
+
 export async function placeBetAction(
   prevState: PlaceBetState,
   formData: FormData
@@ -291,14 +302,126 @@ export async function placeBetAction(
 
   if (!bets.length) return { error: "กรุณาเพิ่มตัวเลขก่อนส่งโพย" };
 
-  const invalid = bets.find((b) => b.amount < 1);
-  if (invalid) return { error: `ยอดแทงขั้นต่ำ 1 บาท (เลข ${invalid.number})` };
+  const user = await getCurrentUser();
+  if (!user) return { error: "กรุณาเข้าสู่ระบบ" };
 
-  const total  = bets.reduce((s, b) => s + b.amount, 0);
-  const slipId = `SLP${Date.now().toString(36).toUpperCase()}`;
+  // ตรวจสอบงวดเปิด
+  const round = await prisma.lotteryRound.findFirst({
+    where: { lotteryTypeId: lotteryId, status: "open" },
+  });
+  if (!round) return { error: "หวยนี้ปิดรับแทงแล้ว" };
 
-  console.log(`[BET] ${slipId} — ${lotteryId} — ${bets.length} items — ฿${total}`);
-  return { success: true, slipId, totalAmount: total };
+  // ดึง BetRate ทั้งหมดสำหรับ lotteryType นี้ (query เดียว)
+  const rates = await prisma.betRate.findMany({
+    where: { lotteryTypeId: lotteryId },
+  });
+  const rateMap = Object.fromEntries(rates.map((r) => [r.betType, r]));
+
+  // ตรวจสอบทุก bet
+  for (const bet of bets) {
+    if (bet.amount < 1) return { error: `ยอดแทงขั้นต่ำ 1 บาท (เลข ${bet.number})` };
+    const dbType = BET_TYPE_MAP[bet.type];
+    if (!dbType) return { error: `ประเภทการแทงไม่ถูกต้อง: ${bet.type}` };
+    const rate = rateMap[dbType];
+    if (!rate) return { error: `ไม่มีอัตราจ่ายสำหรับประเภท ${bet.type}` };
+    if (bet.amount > Number(rate.maxAmount)) return { error: `ยอดแทงสูงสุด ฿${rate.maxAmount} (เลข ${bet.number})` };
+  }
+
+  const total = bets.reduce((s, b) => s + b.amount, 0);
+  if (user.balance < total) return { error: `ยอดเงินไม่เพียงพอ (มี ฿${user.balance.toFixed(2)})` };
+
+  const slipNo = `SLP${Date.now().toString(36).toUpperCase()}`;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: user.id },
+      data:  { balance: { decrement: total } },
+    });
+
+    await tx.betSlip.create({
+      data: {
+        slipNo,
+        userId:      user.id,
+        roundId:     round.id,
+        totalAmount: total,
+        totalPayout: bets.reduce((s, bet) => {
+          const dbType = BET_TYPE_MAP[bet.type]!;
+          return s + bet.amount * Number(rateMap[dbType].payRate);
+        }, 0),
+        status:      "confirmed",
+        confirmedAt: new Date(),
+        items: {
+          create: bets.map((bet) => {
+            const dbType = BET_TYPE_MAP[bet.type]!;
+            const payRate = Number(rateMap[dbType].payRate);
+            return {
+              number:  bet.number,
+              betType: dbType,
+              amount:  bet.amount,
+              payRate,
+              payout:  bet.amount * payRate,
+            };
+          }),
+        },
+      },
+    });
+
+    await tx.transaction.create({
+      data: {
+        userId:        user.id,
+        type:          "bet",
+        amount:        -total,
+        balanceBefore: user.balance,
+        balanceAfter:  user.balance - total,
+        referenceId:   slipNo,
+        note:          `แทงหวย ${bets.length} รายการ`,
+        status:        "completed",
+      },
+    });
+  });
+
+  return { success: true, slipId: slipNo, totalAmount: total };
+}
+
+// ─── Spin Wheel ──────────────────────────────────────────────────────────────
+export async function spinWheelAction(): Promise<{
+  error?: string;
+  prize?: number;
+  diamond?: number;
+}> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "กรุณาเข้าสู่ระบบ" };
+  if (user.diamond < 1) return { error: "Diamond ไม่เพียงพอ" };
+
+  const PRIZES = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000];
+  const prize  = PRIZES[Math.floor(Math.random() * PRIZES.length)];
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const u = await tx.user.update({
+      where: { id: user.id },
+      data: {
+        diamond: { decrement: 1 },
+        balance: { increment: prize },
+      },
+    });
+
+    await tx.transaction.create({
+      data: {
+        userId:        user.id,
+        type:          "win",
+        amount:        prize,
+        balanceBefore: Number(user.balance),
+        balanceAfter:  Number(user.balance) + prize,
+        referenceId:   "spin",
+        note:          `หมุนวงล้อ ได้รับ ฿${prize}`,
+        status:        "completed",
+      },
+    });
+
+    return u;
+  });
+
+  return { prize, diamond: updated.diamond };
 }
 
 // ─── Security & Login History ────────────────────────────────────────────────
