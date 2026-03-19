@@ -21,13 +21,20 @@ const BET_TYPE_LABEL: Record<BetTypeId, string> = {
 };
 
 export interface BetRateRow {
-  id:          BetTypeId;
-  label:       string;
-  rate:        string;   // อัตราจ่าย เช่น "900"
-  discountPct: number;   // ส่วนลด % เช่น 10 = 10%
-  minAmount:   number;
-  maxAmount:   number;
-  isActive:    boolean;
+  id:        BetTypeId;
+  label:     string;
+  rate:      string;   // อัตราจ่าย เช่น "900"
+  minAmount: number;
+  maxAmount: number;
+  isActive:  boolean;
+}
+
+/** ส่วนลด % ทั้งเว็บ อ่านจาก core_settings key = 'lottery.discount_pct' */
+export async function getDiscountPct(): Promise<number> {
+  const row = await prisma.core_settings.findUnique({
+    where: { key: "lottery.discount_pct" },
+  });
+  return row ? Number(row.value_decimal ?? 0) : 0;
 }
 
 export async function getBetRates(lotteryTypeId: string): Promise<BetRateRow[]> {
@@ -45,12 +52,11 @@ export async function getBetRates(lotteryTypeId: string): Promise<BetRateRow[]> 
       if (!id) return null;
       return {
         id,
-        label:       BET_TYPE_LABEL[id] ?? id,
-        rate:        Number(r.payRate).toString(),
-        discountPct: Number(r.discountPct),
-        minAmount:   Number(r.minAmount),
-        maxAmount:   Number(r.maxAmount),
-        isActive:    r.isActive,
+        label:     BET_TYPE_LABEL[id] ?? id,
+        rate:      Number(r.payRate).toString(),
+        minAmount: Number(r.minAmount),
+        maxAmount: Number(r.maxAmount),
+        isActive:  r.isActive,
       } satisfies BetRateRow;
     })
     .filter(Boolean) as BetRateRow[];

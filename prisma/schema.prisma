@@ -84,8 +84,7 @@ model BetRate {
   lotteryTypeId String      @db.VarChar(50)
   lotteryType   LotteryType @relation(fields: [lotteryTypeId], references: [id])
   betType       BetType
-  payRate       Decimal     @db.Decimal(8, 2)            // อัตราจ่าย เช่น 900.00
-  discountPct   Decimal     @default(0.00) @db.Decimal(5, 2)  // ส่วนลด % (0–100)
+  payRate       Decimal     @db.Decimal(8, 2)   // อัตราจ่าย เช่น 900.00
   minAmount     Decimal     @default(1.00)  @db.Decimal(10, 2)
   maxAmount     Decimal     @default(1000.00) @db.Decimal(10, 2)
   isActive      Boolean     @default(true)
