@@ -6,9 +6,10 @@ interface Props {
   betType:   BetTypeId;
   onChange:  (id: BetTypeId) => void;
   betRates?: BetRateRow[];
+  disabled?: boolean;
 }
 
-export default function BetTypeSelector({ betType, onChange, betRates = [] }: Props) {
+export default function BetTypeSelector({ betType, onChange, betRates = [], disabled = false }: Props) {
   // ถ้ามี betRates จาก DB ใช้นั้น ถ้าไม่มีใช้ hardcode fallback
   const buttons = betRates.length > 0
     ? betRates.map((r) => ({ id: r.id, label: r.label, rate: r.rate }))
@@ -21,20 +22,22 @@ export default function BetTypeSelector({ betType, onChange, betRates = [] }: Pr
         {buttons.map((bt) => {
           const active = betType === bt.id;
           return (
-            <button key={bt.id} onClick={() => onChange(bt.id)}
+            <button key={bt.id} onClick={() => !disabled && onChange(bt.id)} disabled={disabled}
               className={[
-                "flex items-center gap-2.5 px-3 py-3 rounded-2xl border-2 transition-all active:scale-95 text-left",
-                active
-                  ? "border-violet-400 bg-violet-50"
-                  : "border-ap-border bg-ap-bg hover:border-ap-blue/30",
+                "flex items-center gap-2.5 px-3 py-3 rounded-2xl border-2 transition-all text-left",
+                disabled
+                  ? "border-ap-border bg-ap-bg opacity-40 cursor-not-allowed"
+                  : active
+                    ? "border-violet-400 bg-violet-50 active:scale-95"
+                    : "border-ap-border bg-ap-bg hover:border-ap-blue/30 active:scale-95",
               ].join(" ")}>
               <span className={[
                 "w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 transition-all",
-                active ? "border-violet-500 bg-violet-500" : "border-ap-border bg-white",
+                active && !disabled ? "border-violet-500 bg-violet-500" : "border-ap-border bg-white",
               ].join(" ")} />
               <div>
-                <p className={`text-[13px] font-bold leading-tight ${active ? "text-violet-700" : "text-ap-primary"}`}>{bt.label}</p>
-                <p className={`text-[11px] mt-0.5 ${active ? "text-violet-500" : "text-ap-secondary"}`}>จ่าย {bt.rate}x</p>
+                <p className={`text-[13px] font-bold leading-tight ${active && !disabled ? "text-violet-700" : "text-ap-primary"}`}>{bt.label}</p>
+                <p className={`text-[11px] mt-0.5 ${active && !disabled ? "text-violet-500" : "text-ap-secondary"}`}>จ่าย {bt.rate}x</p>
               </div>
             </button>
           );

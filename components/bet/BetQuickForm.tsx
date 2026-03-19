@@ -1,6 +1,7 @@
 "use client";
 import { useState, useCallback } from "react";
 import Toast from "@/components/ui/Toast";
+import BetClassicForm from "./BetClassicForm";
 import {
   BetTypeId, TabId, BillRow,
   MAX_DIGITS, TABS, DOUBLED, TRIPLED,
@@ -10,7 +11,7 @@ import type { NumberLimitRow } from "@/lib/db/lottery";
 
 const DB_BET_TYPE: Record<BetTypeId, string> = {
   "3top": "top3", "3tod": "tod3", "2top": "top2", "2bot": "bot2",
-  "run": "run_top", "winlay": "run_bot", "6perm": "top3", "19door": "top2",
+  "run": "run_top", "winlay": "run_bot", "6perm": "top3", "19door": "top2", "winnum": "top2",
 };
 
 function isBlocked(number: string, betType: BetTypeId, limits: NumberLimitRow[]): boolean {
@@ -21,24 +22,28 @@ function isBlocked(number: string, betType: BetTypeId, limits: NumberLimitRow[])
 }
 
 interface Props {
-  betType:      BetTypeId;
-  lotteryName:  string;
-  closeAt?:     string;
-  bills:        BillRow[];
-  totalAmount:  number;
-  numberLimits: NumberLimitRow[];
-  onAddBills:   (rows: BillRow[]) => void;
-  onClearAll:   () => void;
+  betType:       BetTypeId;
+  lotteryName:   string;
+  lotteryFlag?:  string;
+  closeAt?:      string;
+  bills:         BillRow[];
+  totalAmount:   number;
+  numberLimits:  NumberLimitRow[];
+  onAddBills:    (rows: BillRow[]) => void;
+  onClearAll:    () => void;
+  onTabChange?:  (tab: TabId) => void;
 }
 
 export default function BetQuickForm({
   betType,
   lotteryName,
+  lotteryFlag,
   bills,
   totalAmount,
   numberLimits,
   onAddBills,
   onClearAll,
+  onTabChange,
 }: Props) {
   const today = new Date().toLocaleDateString("th-TH", { day: "2-digit", month: "2-digit", year: "numeric" });
 
@@ -165,6 +170,7 @@ export default function BetQuickForm({
             onClick={() => {
               if (!tab.disabled && tab.id !== activeTab) {
                 setActiveTab(tab.id);
+                onTabChange?.(tab.id);
                 setPreview([]);
                 setInputBuf("");
                 setSlipText("");
@@ -185,7 +191,18 @@ export default function BetQuickForm({
         ))}
       </div>
 
-      <div className="p-4">
+      {/* Classic tab */}
+      {activeTab === "classic" && (
+        <BetClassicForm
+          lotteryName={lotteryName}
+          lotteryFlag={lotteryFlag}
+          bills={bills}
+          numberLimits={numberLimits}
+          onAddBills={onAddBills}
+        />
+      )}
+
+      {activeTab !== "classic" && <div className="p-4">
         {/* Title */}
         <div className="mb-3">
           <p className="text-[16px] font-bold text-ap-primary">{TABS.find((t) => t.id === activeTab)?.label ?? activeTab}</p>
@@ -342,7 +359,7 @@ export default function BetQuickForm({
             </button>
           </div>
         </div>
-      </div>
+      </div>}
     </div>
     </>
   );

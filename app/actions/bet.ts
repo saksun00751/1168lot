@@ -7,10 +7,10 @@ import type { BillRow, BetTypeId } from "@/components/bet/types";
 
 const TOP_TYPE: Partial<Record<BetTypeId, BetType>> = {
   "3top": "top3", "3tod": "tod3", "2top": "top2",
-  "6perm": "top3", "19door": "top2", "run": "run_top",
+  "6perm": "top3", "19door": "top2", "run": "run_top", "winnum": "top2",
 };
 const BOT_TYPE: Partial<Record<BetTypeId, BetType>> = {
-  "2top": "bot2", "2bot": "bot2", "19door": "bot2", "winlay": "run_bot",
+  "2top": "bot2", "2bot": "bot2", "19door": "bot2", "winlay": "run_bot", "winnum": "bot2",
 };
 
 export type BetResult = { ok: true } | { ok: false; error: string };

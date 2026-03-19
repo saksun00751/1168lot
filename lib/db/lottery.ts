@@ -17,7 +17,7 @@ const DB_TO_BET_TYPE_ID: Record<BetType, BetTypeId> = {
 const BET_TYPE_LABEL: Record<BetTypeId, string> = {
   "3top": "3 ตัวบน", "3tod": "3 ตัวโต๊ด", "2top": "2 ตัวบน",
   "2bot": "2 ตัวล่าง", "run": "วิ่งบน", "winlay": "วิ่งล่าง",
-  "6perm": "6 เรียงสับ", "19door": "19 ประตู",
+  "6perm": "6กลับ", "19door": "19ประตู", "winnum": "วินเลข",
 };
 
 export interface BetRateRow {
@@ -36,7 +36,7 @@ export async function getBetRates(lotteryTypeId: string): Promise<BetRateRow[]> 
   });
 
   // กำหนดลำดับ
-  const ORDER: BetTypeId[] = ["3top", "3tod", "2top", "2bot", "run", "winlay"];
+  const ORDER: BetTypeId[] = ["3top", "3tod", "2top", "2bot", "run", "winlay", "6perm", "19door", "winnum"];
 
   const mapped = rows
     .map((r) => {
@@ -54,7 +54,18 @@ export async function getBetRates(lotteryTypeId: string): Promise<BetRateRow[]> 
     .filter(Boolean) as BetRateRow[];
 
   mapped.sort((a, b) => ORDER.indexOf(a.id) - ORDER.indexOf(b.id));
-  return mapped;
+
+  // append derived types (6perm → rate of 3top, 19door/winnum → rate of 2top)
+  const rate3top = mapped.find((r) => r.id === "3top");
+  const rate2top = mapped.find((r) => r.id === "2top");
+
+  const derived: BetRateRow[] = [
+    rate3top && { id: "6perm",  label: "6กลับ",   rate: rate3top.rate, minAmount: rate3top.minAmount, maxAmount: rate3top.maxAmount, isActive: true },
+    rate2top && { id: "19door", label: "19ประตู", rate: rate2top.rate, minAmount: rate2top.minAmount, maxAmount: rate2top.maxAmount, isActive: true },
+    rate2top && { id: "winnum", label: "วินเลข",  rate: rate2top.rate, minAmount: rate2top.minAmount, maxAmount: rate2top.maxAmount, isActive: true },
+  ].filter(Boolean) as BetRateRow[];
+
+  return [...mapped, ...derived];
 }
 
 export interface NumberLimitRow {

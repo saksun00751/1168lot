@@ -1,4 +1,4 @@
-export type BetTypeId = "3top" | "3tod" | "2top" | "2bot" | "run" | "winlay" | "6perm" | "19door";
+export type BetTypeId = "3top" | "3tod" | "2top" | "2bot" | "run" | "winlay" | "6perm" | "19door" | "winnum";
 export type TabId     = "quick" | "classic" | "slip" | "h95";
 export type LeftTab   = "3top" | "2top" | "run";
 
@@ -14,7 +14,7 @@ export interface BillRow {
 }
 
 export const MAX_DIGITS: Record<BetTypeId, number> = {
-  "3top": 3, "3tod": 3, "2top": 2, "2bot": 2, "run": 1, "winlay": 1, "6perm": 3, "19door": 2,
+  "3top": 3, "3tod": 3, "2top": 2, "2bot": 2, "run": 1, "winlay": 1, "6perm": 3, "19door": 1, "winnum": 2,
 };
 
 export const BET_TYPE_BTNS: { id: BetTypeId; label: string; rate: string }[] = [
@@ -24,13 +24,16 @@ export const BET_TYPE_BTNS: { id: BetTypeId; label: string; rate: string }[] = [
   { id: "2bot",   label: "2 ตัวล่าง", rate: "95"   },
   { id: "run",    label: "วิ่งบน",     rate: "3.5"  },
   { id: "winlay", label: "วิ่งล่าง",   rate: "4.5"  },
+  { id: "6perm",  label: "6กลับ",      rate: "900"  },
+  { id: "19door", label: "19ประตู",    rate: "95"   },
+  { id: "winnum", label: "วินเลข",     rate: "95"   },
 ];
 
 export const TABS: { id: TabId; label: string; disabled?: boolean }[] = [
   { id: "quick",   label: "แทงเร็ว"           },
-  { id: "classic", label: "แทงแบบคลาสสิค", disabled: true },
-  { id: "slip",    label: "วางโพย"                              },
-  { id: "h95",     label: "หวย95",            disabled: true },
+  { id: "classic", label: "แทงแบบคลาสสิค" },
+  { id: "slip",    label: "วางโพย"          },
+  { id: "h95",     label: "หวย100"          },
 ];
 
 export const LEFT_TABS: { id: LeftTab; label: string }[] = [
@@ -48,7 +51,7 @@ export const PAST_RESULTS = [
 ];
 
 export const BET_RATE: Record<BetTypeId, number> = {
-  "3top": 900, "3tod": 150, "2top": 95, "2bot": 95, "run": 3.5, "winlay": 4.5, "6perm": 900, "19door": 95,
+  "3top": 900, "3tod": 150, "2top": 95, "2bot": 95, "run": 3.5, "winlay": 4.5, "6perm": 900, "19door": 95, "winnum": 95,
 };
 
 export const DOUBLED = ["00","11","22","33","44","55","66","77","88","99"];
@@ -68,9 +71,10 @@ export function permutations(str: string): string[] {
 }
 
 export function nineteenDoor(num: string): string[] {
-  const [x, y] = [num[0], num[1]];
+  // รับ 1 หลัก: สร้างทุกเลข 2 หลักที่มีตัวเลขนั้นอยู่ในตำแหน่งใดก็ได้
+  const d = num.length === 1 ? num[0] : num[0];
   const set = new Set<string>();
-  for (let i = 0; i <= 9; i++) { set.add(x + i); set.add(i + y); }
+  for (let i = 0; i <= 9; i++) { set.add(d + String(i)); set.add(String(i) + d); }
   return [...set].sort();
 }
 

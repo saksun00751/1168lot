@@ -34,8 +34,9 @@ export default function LotteryLayoutPage({
   myBetHistory?: BetSlipSummary[];
   pastResults?:  PastResultRow[];
 }) {
-  const [bills,   setBills]   = useState<BillRow[]>([]);
-  const [betType, setBetType] = useState<BetTypeId>("3top");
+  const [bills,     setBills]     = useState<BillRow[]>([]);
+  const [betType,   setBetType]   = useState<BetTypeId>("3top");
+  const [isClassic, setIsClassic] = useState(false);
 
   const totalAmount = bills.reduce((s, b) => s + b.top + b.bot, 0);
   const totalMaxWin = bills.reduce((s, b) => s + (b.top + b.bot) * BET_RATE[b.betType], 0);
@@ -86,16 +87,18 @@ export default function LotteryLayoutPage({
 
           {/* Main column */}
           <div className="space-y-3">
-            <BetTypeSelector betType={betType} onChange={changeBetType} betRates={betRates} />
+            <BetTypeSelector betType={betType} onChange={changeBetType} betRates={betRates} disabled={isClassic} />
             <BetQuickForm
               betType={betType}
               lotteryName={lotteryName}
+              lotteryFlag={lotteryFlag}
               closeAt={closeAt}
               bills={bills}
               totalAmount={totalAmount}
               numberLimits={numberLimits}
               onAddBills={handleAddBills}
               onClearAll={handleClearAll}
+              onTabChange={(tab) => setIsClassic(tab === "classic")}
             />
           </div>
 
